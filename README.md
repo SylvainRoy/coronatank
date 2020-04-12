@@ -9,11 +9,11 @@ Also, the outcome of being locked at home because of the coronavirus. :-)
 
 Ensure to have python (3.6 or above) and then install pygame:
 
- python3 -m pip install pygame
+    python3 -m pip install pygame
 
 Then, to launch the game:
 
- python3 game.py
+    python3 game.py
 
 Press all the keys of your keyboard to figure out how to move, rotate,
 rotate the turret, fire with the two tanks. (Enjoy!)
