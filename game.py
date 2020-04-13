@@ -21,8 +21,11 @@ def main():
 
     while True:
 
-        # Process events
+        # Collect events and pressed keys
         events = pygame.event.get()
+        pressed = pygame.key.get_pressed()
+
+        # Quit?
         for event in events:
             if ((event.type == pygame.QUIT)
                 or (event.type == pygame.KEYUP and event.key == pygame.K_ESCAPE)):
@@ -30,31 +33,21 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-        # Process pushed keys
-        pressed = pygame.key.get_pressed()
-
         # Compute new positions
-        for tank in tanks:
-            tank.update(events, pressed, projectiles, walls)
-        for projectile in projectiles:
-            projectile.update(walls, tanks)
+        for obj in tanks + projectiles:
+            obj.update(events, pressed, projectiles, walls, tanks)
+
+        # Remove projectiles which have left the screen
+        maxX, maxY = CONFIG["screen"]
+        for i in range(len(projectiles)-1, -1, -1):
+            projX, projY = projectiles[i].position
+            if not ((0 <= projX <= maxX) and (0 <= projY <= maxY)):
+                del(projectiles[i])
 
         # Redraw boards
         screen.fill((220, 220, 220, 0))
-        for wall in walls:
-            wall.draw(screen)
-        for tank in tanks:
-            tank.draw(screen)
-        for projectile in projectiles:
-            projectile.draw(screen)
-
-        # Remove projectiles which have left the screen
-        for i in range(len(projectiles)-1, -1, -1):
-            projX, projY = projectiles[i].position
-            if not ((0 <= projX <= CONFIG["screen"][0]) and (0 <= projY <= CONFIG["screen"][1])):
-                del(projectiles[i])
-
-        # Update the display
+        for obj in walls + tanks + projectiles:
+            obj.draw(screen)
         pygame.display.update()
 
         # Ensure constant FPS

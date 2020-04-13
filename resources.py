@@ -50,7 +50,7 @@ class Tank:
         # Display the tank
         screen.blit(surface, (x,y))
 
-    def update(self, events, pressed, projectiles, walls):
+    def update(self, events, pressed, projectiles, walls, tanks):
         """
         Updates the state of the tank based on player's input and game state.
         """
@@ -164,7 +164,7 @@ class Amunition:
         elif self.state == AmunitionState.detonated:
             pygame.draw.circle(screen, (0,0,0,255), self.position, 30)
 
-    def update(self, walls, tanks):
+    def update(self, events, pressed, projectiles, walls, tanks):
         """
         Updates the state of the projectile.
         """
