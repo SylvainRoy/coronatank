@@ -2,11 +2,8 @@
 
 
 import pygame
-from pygame.locals import *
 from math import cos, sin, sqrt, radians, copysign
 from enum import Enum
-
-from tools import segment_intersect
 
 
 class Tank:
