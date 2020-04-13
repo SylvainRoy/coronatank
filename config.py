@@ -25,7 +25,7 @@ CONFIG = {
 
     "tanks": [
         {"position": (50, 50), "angle": -45, "color": (20, 150, 50, 255)},
-        {"position": (750, 550), "angle": 135, "color": (50, 150, 250, 255)}
+        {"position": (-50, -50), "angle": 135, "color": (50, 150, 250, 255)}
     ],
 
     # One player on the keyboard
@@ -63,8 +63,9 @@ def setBattleField():
     # Prepare two tanks
     tanks = []
     for i in range(2):
+        x, y = (CONFIG["tanks"][i]["position"][j] % CONFIG["screen"][j] for j in range(2))
         t = Tank(CONFIG["tankDimensions"],
-                 CONFIG["tanks"][i]["position"],
+                 (x, y),
                  CONFIG["tankMaxSpeed"],
                  CONFIG["tanks"][i]["angle"],
                  CONFIG["tankDeltaAngle"],
