@@ -6,11 +6,14 @@ This file contains the configuration of the game.
 
 
 import pygame
-from resources import Tank, Turret, Wall, Pilot
+
 
 CONFIG = {
     "fps": 50,
     "screen": (800, 600),
+
+    "ip": "127.0.0.1",
+    "port": 8080,
 
     "tankDimensions": (50, 40),
     "tankMaxSpeed": 5, # 7
@@ -25,7 +28,9 @@ CONFIG = {
 
     "tanks": [
         {"position": (50, 50), "angle": -45, "color": (20, 150, 50, 255)},
-        {"position": (-50, -50), "angle": 135, "color": (50, 150, 250, 255)}
+        {"position": (-50, -50), "angle": 135, "color": (50, 150, 250, 255)},
+        {"position": (-50, 50), "angle": -135, "color": (150, 20, 50, 255)},
+        {"position": (50, -50), "angle": 45, "color": (150, 50, 20, 255)}
     ],
 
     # One player on the keyboard
@@ -53,36 +58,3 @@ CONFIG = {
                         "turretLeft":  pygame.K_COMMA,
                         "fire":        pygame.K_PERIOD}]
 }
-
-
-def setBattleField():
-    """
-    Prepare the tanks and walls of the battlefield.
-    """
-
-    # Prepare two tanks
-    tanks = []
-    for i in range(2):
-        x, y = (CONFIG["tanks"][i]["position"][j] % CONFIG["screen"][j] for j in range(2))
-        t = Tank(CONFIG["tankDimensions"],
-                 (x, y),
-                 CONFIG["tankMaxSpeed"],
-                 CONFIG["tanks"][i]["angle"],
-                 CONFIG["tankDeltaAngle"],
-                 CONFIG["tanks"][i]["color"],
-                 CONFIG["wallThickness"],
-                 Turret(CONFIG["tankDimensions"],
-                        CONFIG["turretDeltaAngle"],
-                        CONFIG["turretMaxAngularSpeed"],
-                        CONFIG["turretColor"]),
-                 Pilot(CONFIG["keymap2players"][i]))
-        tanks.append(t)
-
-    # Prepare walls
-    walls = [Wall((200, 100), (200, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((200, 300), (500, 300), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((450, 450), (650, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((650, 200), (650, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((400, 200), (650, 200), CONFIG["wallThickness"], CONFIG["wallColor"])]
-
-    return (tanks, walls)

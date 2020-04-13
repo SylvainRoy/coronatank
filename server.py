@@ -9,10 +9,10 @@ import asyncio
 import struct
 
 from tools import encode_message, decode_message, MSGLEN
+from config import CONFIG
 
 
 Clients = {}
-CurrentID = 1
 
 
 class EchoServerProtocol(asyncio.Protocol):
@@ -21,14 +21,19 @@ class EchoServerProtocol(asyncio.Protocol):
         self.buffer = b''
 
     def connection_made(self, transport):
-        global CurrentID, Clients
-        self.clientId = CurrentID
-        CurrentID += 1
+        global Clients
+        self.clientId = min(range(len(Clients)+1) - Clients.keys())
+        tankConfig = CONFIG["tanks"][self.clientId]
+        x, y = tankConfig["position"]
+        angle = tankConfig["angle"]
         Clients[self.clientId] = transport
-        transport.write(encode_message(self.clientId, 0, 0, 0))
+        transport.write(encode_message(self.clientId, x, y, angle, 0, 0))
         print('Connection from {} got assigned ID {}'.format(
             transport.get_extra_info('peername'),
             self.clientId))
+
+    def connection_lost(self, exc):
+        del(Clients[self.clientId])
 
     def data_received(self, data):
         global Clients
@@ -36,6 +41,7 @@ class EchoServerProtocol(asyncio.Protocol):
         while len(self.buffer) >= MSGLEN:
             for clientid, transport in Clients.items():
                 if clientid != self.clientId:
+                    #print("{} => {}: {}".format(self.clientId, clientid, decode_message(self.buffer[:MSGLEN])))
                     transport.write(self.buffer[:MSGLEN])
             self.buffer = self.buffer[MSGLEN:]
 
@@ -47,4 +53,5 @@ async def main():
         await server.serve_forever()
 
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())

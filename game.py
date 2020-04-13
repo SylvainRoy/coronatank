@@ -4,7 +4,8 @@
 import sys
 import pygame
 
-from config import setBattleField, CONFIG
+from config import CONFIG
+from resources import setBattleField
 
 
 def main():
@@ -16,8 +17,12 @@ def main():
     fpsClock = pygame.time.Clock()
 
     # Set up the battlefield
-    (tanks, walls) = setBattleField()
+    (tanks, walls, client) = setBattleField("local")
     projectiles = []
+
+    # Connect to server
+    if client:
+        client.connect()
 
     while True:
 
@@ -33,8 +38,13 @@ def main():
                 pygame.quit()
                 sys.exit()
 
+        # Get remote tanks from server
+        remoteTanks = []
+        if client:
+            remoteTanks = client.update()
+
         # Compute new positions
-        for obj in tanks + projectiles:
+        for obj in tanks + remoteTanks + projectiles:
             obj.update(events, pressed, projectiles, walls, tanks)
 
         # Remove projectiles which have left the screen
@@ -46,7 +56,7 @@ def main():
 
         # Redraw boards
         screen.fill((220, 220, 220, 0))
-        for obj in walls + tanks + projectiles:
+        for obj in walls + tanks + remoteTanks + projectiles:
             obj.draw(screen)
         pygame.display.update()
 

@@ -22,17 +22,22 @@ def segment_intersect(segment1, segment2):
 
 
 
-MSGLEN = 16
+MSGLEN = 24
 
-def encode_message(a,b,c,d):
+def encode_message(_id, x, y, angle, angleturret, fire):
     """
     Binary encode 4 integer.
     """
-    return struct.pack('iiii', a,b,c,d)
+    if fire:
+        fireInt = 1
+    else:
+        fireInt = 0
+    return struct.pack('iiiiii', _id, x, y, angle, angleturret, fireInt)
 
 
 def decode_message(data):
     """
     Binary decode 4 integers.
     """
-    return struct.unpack('iiii', data)
+    _id, x, y, angle, angleturret, fireInt = struct.unpack('iiiiii', data)
+    return _id, x, y, angle, angleturret, (fireInt == 1)

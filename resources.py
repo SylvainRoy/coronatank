@@ -2,8 +2,15 @@
 
 
 import pygame
+import socket
+import time
+
+from collections import defaultdict
 from math import cos, sin, sqrt, radians, copysign
 from enum import Enum
+
+from tools import encode_message, decode_message, MSGLEN
+from config import CONFIG
 
 
 class Tank:
@@ -14,7 +21,7 @@ class Tank:
 
     def __init__(self, dimensions, position, maxSpeed, angle, deltaAngle, color, wallThickness, turret, pilot):
         self.dimensions = dimensions
-        self.position = position
+        self.position = (position[j] % CONFIG["screen"][j] for j in range(2))
         self.maxSpeed = maxSpeed
         self.angle = angle
         self.deltaAngle = deltaAngle
@@ -25,6 +32,8 @@ class Tank:
         self.turret.tank = self
         self.pilot = pilot
         self.destroyed = False
+        self._id = None
+        self.fire = False
 
     def draw(self, screen):
         """
@@ -59,8 +68,8 @@ class Tank:
         # Get instruction from pilot
         commands = self.pilot.update(self, events, pressed, projectiles, walls)
         # Update the tank accordingly
-        self.angle, self.speed, self.position, self.turret.angle, fire = commands
-        if fire:
+        self.angle, self.speed, self.position, self.turret.angle, self.fire = commands
+        if self.fire:
             self.turret.fire(projectiles)
 
     def detect_collision(self, position, walls):
@@ -290,3 +299,192 @@ class Pilot:
             fire = True
 
         return newtankangle, newtankspeed, newtankposition, newturretangle, fire
+
+
+class RemotePilot:
+    """
+    A "dummy' pilot which only executes instructions from a server.
+    """
+
+    def __init__(self):
+        self.position = (0,0)
+        self.angle = 0
+
+    def update(self, tank, events, pressed, projectiles, walls):
+        """
+        Return latest instructions to the tank.
+        """
+        fire = self.fire
+        self.fire = False
+        return self.angle, 0, self.position, self.angleturret, fire
+
+    def remote_update(self, position, angle, angleturret, fire):
+        """
+        Update the pilot with the information from the server.
+        """
+        self.position = position
+        self.angle = angle
+        self.angleturret = angleturret
+        self.fire = fire
+
+
+class Client:
+    """
+    A TCP client to connect to the server and exchange tanks positions, angles, etc.
+    """
+
+    def __init__(self, ip, port, tanks, remote_tank_factory):
+        assert(len(tanks) == 1)
+        self.remoteTanks = defaultdict(remote_tank_factory)
+        self.tanks = tanks
+        self.ip = ip
+        self.port = port
+        self.data = b''
+        self.socket = None
+        self._previousMsg = defaultdict(lambda: None)
+
+    def connect(self):
+        """
+        Connect the client to the server in non-blocking mode.
+        """
+        assert(len(self.tanks) == 1)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        err = self.socket.connect(('127.0.0.1', 8888))
+        self.socket.setblocking(0)
+        data = b''
+        while len(data) < MSGLEN:
+            try:
+                r = self.socket.recv(MSGLEN)
+                if r == b'':
+                    raise RuntimeError("Connection with server broken.")
+            except BlockingIOError:
+                r = b''
+            data += r
+        (_id, x, y, angle, _, _) = decode_message(data)
+        x = x % CONFIG["screen"][0]
+        y = y % CONFIG["screen"][1]
+        self.tanks[0]._id = _id
+        self.tanks[0].position = (x,y)
+        self.tanks[0].angle = angle
+
+    def _send_data(self, msg):
+        """
+        Internal method to send data to the server.
+        """
+        totalsent = 0
+        while totalsent < len(msg):
+            sent = self.socket.send(msg[totalsent:])
+            if sent == 0:
+                raise RuntimeError("Connection with server broken.")
+            totalsent += sent
+
+    def _recv_data(self):
+        """
+        Internal method to recv data from the server.
+        """
+        try:
+            data = self.socket.recv(MSGLEN)
+            if data == b'':
+                raise RuntimeError("Connection with server broken.")
+        except BlockingIOError:
+            data = b''
+        self.data += data
+
+    def update(self):
+        """
+        Send the position of the local tanks to the server.
+        Then, receive the position of the remote tanks from the server and update their pilots accordingly.
+        """
+        # Send positions of local tanks
+        for tank in self.tanks:
+            msg = encode_message(tank._id, int(tank.position[0]), int(tank.position[1]),
+                                 int(tank.angle), int(tank.turret.angle), tank.fire)
+            if self._previousMsg[tank._id] != msg:
+                self._send_data(msg)
+                self._previousMsg[tank._id] = msg
+        # Read positions of remote self.tanks
+        self._recv_data()
+        while len(self.data) >= MSGLEN:
+            _id, x, y, angle, angleturret, fire = decode_message(self.data[:MSGLEN])
+            x = x % CONFIG["screen"][0]
+            y = y % CONFIG["screen"][1]
+            self.data = self.data[MSGLEN:]
+            t = self.remoteTanks[_id].pilot.remote_update((x,y), angle, angleturret, fire)
+        return list(self.remoteTanks.values())
+
+
+def setBattleField(mode):
+    """
+    Prepare the tanks and walls of the battlefield.
+    Parameter 'mode' can "local" or "server".
+    """
+
+    # Prepare tanks (2 if 'local', 1 if 'server') and client.
+    if mode == "local":
+        tanks = []
+        for i in range(2):
+            x, y = (CONFIG["tanks"][i]["position"][j] % CONFIG["screen"][j] for j in range(2))
+            t = Tank(CONFIG["tankDimensions"],
+                     (x, y),
+                     CONFIG["tankMaxSpeed"],
+                     CONFIG["tanks"][i]["angle"],
+                     CONFIG["tankDeltaAngle"],
+                     CONFIG["tanks"][i]["color"],
+                     CONFIG["wallThickness"],
+                     Turret(CONFIG["tankDimensions"],
+                            CONFIG["turretDeltaAngle"],
+                            CONFIG["turretMaxAngularSpeed"],
+                            CONFIG["turretColor"]),
+                     Pilot(CONFIG["keymap2players"][i]))
+            tanks.append(t)
+        client = None
+
+    elif mode == "server":
+        tanks = []
+        x, y = (CONFIG["tanks"][0]["position"][j] % CONFIG["screen"][j] for j in range(2))
+        t = Tank(CONFIG["tankDimensions"],
+                 (x, y),
+                 CONFIG["tankMaxSpeed"],
+                 CONFIG["tanks"][0]["angle"],
+                 CONFIG["tankDeltaAngle"],
+                 CONFIG["tanks"][0]["color"],
+                 CONFIG["wallThickness"],
+                 Turret(CONFIG["tankDimensions"],
+                        CONFIG["turretDeltaAngle"],
+                        CONFIG["turretMaxAngularSpeed"],
+                        CONFIG["turretColor"]),
+                 Pilot(CONFIG["keymap1player"]))
+        tanks.append(t)
+        client = Client(CONFIG["ip"], CONFIG["port"], tanks, remote_tank_factory)
+
+    else:
+        raise RuntimeError("The mode '{}' doesn't exist.".format(mode))
+
+    # Prepare walls
+    walls = [Wall((200, 100), (200, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
+             Wall((200, 300), (500, 300), CONFIG["wallThickness"], CONFIG["wallColor"]),
+             Wall((450, 450), (650, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
+             Wall((650, 200), (650, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
+             Wall((400, 200), (650, 200), CONFIG["wallThickness"], CONFIG["wallColor"])]
+
+    return (tanks, walls, client)
+
+
+def remote_tank_factory():
+    """
+    Build a tank controled remotely.
+    """
+    x, y = (100, 100)
+    t = Tank(CONFIG["tankDimensions"],
+             (x, y),
+             CONFIG["tankMaxSpeed"],
+             CONFIG["tanks"][0]["angle"],
+             CONFIG["tankDeltaAngle"],
+             (143, 138, 124, 255),
+             CONFIG["wallThickness"],
+             Turret(CONFIG["tankDimensions"],
+                    CONFIG["turretDeltaAngle"],
+                    CONFIG["turretMaxAngularSpeed"],
+                    CONFIG["turretColor"]),
+             RemotePilot())
+    return t
