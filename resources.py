@@ -19,16 +19,12 @@ class Tank:
     It requires a turret and a pilot.
     """
 
-    def __init__(self, dimensions, position, maxSpeed, angle, deltaAngle, color, wallThickness, turret, pilot):
+    def __init__(self, position, angle, color, turret, pilot):
         self._id = None
-        self.dimensions = dimensions
         self.position = tuple((position[j] % Config.screen[j] for j in range(2)))
-        self.maxSpeed = maxSpeed
         self.angle = angle
-        self.deltaAngle = deltaAngle
         self.color = color
         self.speed = 0
-        self.wallThickness = wallThickness
         self.turret = turret
         self.turret.tank = self
         self.pilot = pilot
@@ -39,17 +35,17 @@ class Tank:
         """
         Draws the tank.
         """
-        surface = pygame.Surface(self.dimensions).convert_alpha()
+        surface = pygame.Surface(Config.tankDimensions).convert_alpha()
         surface.fill((0,0,0,0))
         # Draw the body of the tank
-        pygame.draw.rect(surface, self.color, pygame.Rect((0,0), self.dimensions))
+        pygame.draw.rect(surface, self.color, pygame.Rect((0,0), Config.tankDimensions))
         # Draw the caterpillars
         pygame.draw.rect(surface, (255,255,255,255),
                          pygame.Rect((0,0),
-                                     (self.dimensions[0], self.dimensions[1]//6)))
+                                     (Config.tankDimensions[0], Config.tankDimensions[1]//6)))
         pygame.draw.rect(surface, (255,255,255,255),
-                         pygame.Rect((0, 5*self.dimensions[1]//6 + 1),
-                                     self.dimensions))
+                         pygame.Rect((0, 5*Config.tankDimensions[1]//6 + 1),
+                                     Config.tankDimensions))
         # Draw the turret
         self.turret.draw(surface)
         # Rotate the tank
@@ -93,7 +89,7 @@ class Tank:
         """
         if position is None:
             position = self.position
-        innersize = min(self.dimensions) - 2 * self.wallThickness
+        innersize = min(Config.tankDimensions) - 2 * Config.wallThickness
         return pygame.Rect((position[0] - innersize//2, position[1] - innersize//2),
                            (innersize, innersize))
 
@@ -103,7 +99,7 @@ class Tank:
         """
         if position is None:
             position = self.position
-        avgsize = (self.dimensions[0] + self.dimensions[1]) // 2
+        avgsize = (Config.tankDimensions[0] + Config.tankDimensions[1]) // 2
         return pygame.Rect((position[0] - avgsize//2, position[1] - avgsize//2),
                            (avgsize, avgsize))
 
@@ -130,15 +126,13 @@ class Turret:
     The turrets that seats on top of the tanks.
     """
 
-    def __init__(self, dimensions, deltaAngle, color):
+    def __init__(self):
         self.angle = 0
-        self.deltaAngle = deltaAngle
-        self.dimensions = dimensions
-        self.color = color
+        self.color = Config.turretColor
         self.tank = None
-        self.centerX = self.dimensions[0] // 2
-        self.centerY = self.dimensions[1] // 2
-        self.canonLen = min(self.dimensions) // 2
+        self.centerX = Config.tankDimensions[0] // 2
+        self.centerY = Config.tankDimensions[1] // 2
+        self.canonLen = min(Config.tankDimensions) // 2
         self.radius = self.canonLen // 2
 
     def draw(self, surface):
@@ -218,13 +212,12 @@ class Wall:
     The walls of the battlefield.
     """
 
-    def __init__(self, beg, end, thickness, color):
+    def __init__(self, beg, end):
         assert(beg[0] <= end[0])
         assert(beg[1] <= end[1])
         self.beg = beg
         self.end = end
-        self.thickness = thickness
-        self.color = color
+        thickness = Config.wallThickness
         self.rect = pygame.Rect((beg[0]-thickness, beg[1]-thickness),
                                 (end[0]-beg[0]+2*thickness, end[1]-beg[1]+2*thickness))
 
@@ -232,7 +225,7 @@ class Wall:
         """
         Draws the wall.
         """
-        pygame.draw.line(screen, self.color, self.beg, self.end, 4)
+        pygame.draw.line(screen, Config.wallColor, self.beg, self.end, 4)
 
     def draw_rect(self, screen):
         """
@@ -319,13 +312,13 @@ class Pilot:
                            turretangle=tank.turret.angle, fire=False, state=Command.State.destroyed)
 
         # Compute new tank angle based on player's input
-        rotation = tank.deltaAngle * (pressed[self.left] - pressed[self.right])
+        rotation = Config.tankDeltaAngle * (pressed[self.left] - pressed[self.right])
         newtankangle = tank.angle + rotation
 
         # Update tank speed based on player's input
         translation = pressed[self.forward] - pressed[self.backward]
         if translation != 0:
-            newtankspeed = max(-tank.maxSpeed, min(tank.maxSpeed, tank.speed + translation))
+            newtankspeed = max(-Config.tankMaxSpeed, min(Config.tankMaxSpeed, tank.speed + translation))
         elif tank.speed != 0:
             # Progressively stop the tank if no input from the player
             newtankspeed = copysign(abs(tank.speed)-1, tank.speed)
@@ -350,7 +343,7 @@ class Pilot:
                 break
 
         # Compute turret angle based on player's input
-        rotation = tank.turret.deltaAngle * (pressed[self.turretLeft] - pressed[self.turretRight])
+        rotation = Config.turretDeltaAngle * (pressed[self.turretLeft] - pressed[self.turretRight])
         newturretangle = tank.turret.angle + rotation
 
         # Fire a new projectile
@@ -399,15 +392,25 @@ class Client:
     A TCP client to connect to the server and exchange tanks positions, angles, etc.
     """
 
-    def __init__(self, ip, port, tanks, remote_tank_factory):
+    def __init__(self, ip, port, tanks):
         assert(len(tanks) == 1)
-        self.remoteTanks = defaultdict(remote_tank_factory)
+        self.remoteTanks = defaultdict(self.tank_factory)
         self.tanks = tanks
         self.ip = ip
         self.port = port
         self.data = b''
         self.socket = None
         self._previousMsg = defaultdict(lambda: None)
+
+    def tank_factory(self):
+        """
+        Build a tank controled remotely.
+        """
+        return Tank(Config.tanks[0]["position"],
+                    Config.tanks[0]["angle"],
+                    (143, 138, 124, 255),
+                    Turret(),
+                    RemotePilot())
 
     def connect(self):
         """
@@ -493,70 +496,30 @@ def setBattleField(mode):
     Prepare the tanks and walls of the battlefield.
     Parameter 'mode' can "local" or "server".
     """
-
-    # Prepare tanks (2 if 'local', 1 if 'server') and client.
+    # Prepare tanks (2 if 'local' mode, 1 if 'server' mode) and client.
     if mode == "local":
         tanks = []
         for i in range(2):
-            x, y = (Config.tanks[i]["position"][j] % Config.screen[j] for j in range(2))
-            t = Tank(Config.tankDimensions,
-                     (x, y),
-                     Config.tankMaxSpeed,
+            t = Tank(Config.tanks[i]["position"],
                      Config.tanks[i]["angle"],
-                     Config.tankDeltaAngle,
                      Config.tanks[i]["color"],
-                     Config.wallThickness,
-                     Turret(Config.tankDimensions,
-                            Config.turretDeltaAngle,
-                            Config.turretColor),
+                     Turret(),
                      Pilot(Config.keymap2players[i]))
             tanks.append(t)
         client = None
-
     elif mode == "server":
         tanks = []
-        x, y = (Config.tanks[0]["position"][j] % Config.screen[j] for j in range(2))
-        t = Tank(Config.tankDimensions,
-                 (x, y),
-                 Config.tankMaxSpeed,
+        t = Tank(Config.tanks[0]["position"],
                  Config.tanks[0]["angle"],
-                 Config.tankDeltaAngle,
                  Config.tanks[0]["color"],
-                 Config.wallThickness,
-                 Turret(Config.tankDimensions,
-                        Config.turretDeltaAngle,
-                        Config.turretColor),
+                 Turret(),
                  Pilot(Config.keymap1player))
         tanks.append(t)
-        client = Client(Config.ip, Config.port, tanks, remote_tank_factory)
-
+        client = Client(Config.ip, Config.port, tanks)
     else:
         raise RuntimeError("The mode '{}' doesn't exist.".format(mode))
 
     # Prepare walls
-    walls = [Wall((200, 100), (200, 450), Config.wallThickness, Config.wallColor),
-             Wall((200, 300), (500, 300), Config.wallThickness, Config.wallColor),
-             Wall((450, 450), (650, 450), Config.wallThickness, Config.wallColor),
-             Wall((650, 200), (650, 450), Config.wallThickness, Config.wallColor),
-             Wall((400, 200), (650, 200), Config.wallThickness, Config.wallColor)]
+    walls = [Wall(w[0], w[1]) for w in Config.walls]
 
     return (tanks, walls, client)
-
-
-def remote_tank_factory():
-    """
-    Build a tank controled remotely.
-    """
-    x, y = (100, 100)
-    t = Tank(Config.tankDimensions,
-             (x, y),
-             Config.tankMaxSpeed,
-             Config.tanks[0]["angle"],
-             Config.tankDeltaAngle,
-             (143, 138, 124, 255),
-             Config.wallThickness,
-             Turret(Config.tankDimensions,
-                    Config.turretDeltaAngle,
-                    Config.turretColor),
-             RemotePilot())
-    return t

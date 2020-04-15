@@ -34,6 +34,14 @@ class Config:
         {"position": (50, -50), "angle": 45, "color": (150, 50, 20, 255)}
     ]
 
+    walls = [
+        ((200, 100), (200, 450)),
+        ((200, 300), (500, 300)),
+        ((450, 450), (650, 450)),
+        ((650, 200), (650, 450)),
+        ((400, 200), (650, 200))
+    ]
+
     # One player using the keyboard
     keymap1player = {"forward":     pygame.K_w,
                      "backward":    pygame.K_s,
