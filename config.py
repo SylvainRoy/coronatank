@@ -18,10 +18,11 @@ CONFIG = {
     "tankDimensions": (50, 40),
     "tankMaxSpeed": 5, # 7
     "tankDeltaAngle": 6,
+    "tankDeathDuration": 5,
 
     "turretColor": (50, 50, 50, 255),
-    "turretDeltaAngle": 3,
-    "turretMaxAngularSpeed": 5, # 7
+    "turretDeltaAngle": 2,
+    #"turretMaxAngularSpeed": 5, # 7
 
     "wallColor": (200, 120, 10),
     "wallThickness": 10,
@@ -33,7 +34,7 @@ CONFIG = {
         {"position": (50, -50), "angle": 45, "color": (150, 50, 20, 255)}
     ],
 
-    # One player on the keyboard
+    # One player using the keyboard
     "keymap1player": {"forward":     pygame.K_w,
                       "backward":    pygame.K_s,
                       "left":        pygame.K_a,

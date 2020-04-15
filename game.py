@@ -17,7 +17,7 @@ def main():
     fpsClock = pygame.time.Clock()
 
     # Set up the battlefield
-    (tanks, walls, client) = setBattleField("local")
+    (tanks, walls, client) = setBattleField("server") # server or local
     projectiles = []
 
     # Connect to server
