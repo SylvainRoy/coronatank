@@ -424,22 +424,12 @@ class Client:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         err = self.socket.connect(('127.0.0.1', 8888))
         self.socket.setblocking(0)
-
-        # Receive initial position of the tank
-
-        # todo: This could be replace by a call to _recv_data
-        data = b''
-        while len(data) < Command.Msglen:
-            try:
-                r = self.socket.recv(Command.Msglen - len(data))
-                if r == b'':
-                    raise RuntimeError("Connection with server broken.")
-            except BlockingIOError:
-                r = b''
-            data += r
-        # end of todo
-
-        cmd = Command().decode(data)
+        # Receive ID of the local tank
+        while len(self.data) < Command.Msglen:
+            self._recv_data(Command.Msglen - len(self.data))
+        cmd = Command().decode(self.data[:Command.Msglen])
+        self.data = self.data[Command.Msglen:]
+        # Update the local tank
         tank = self.tanks[0]
         tank._id = cmd._id
         tank.position = Config.tanks[tank._id]["position"]
