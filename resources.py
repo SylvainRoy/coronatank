@@ -10,7 +10,7 @@ from collections import defaultdict
 from math import cos, sin, sqrt, radians, copysign
 from enum import Enum
 from collections import namedtuple
-from config import CONFIG
+from config import Config
 
 
 class Tank:
@@ -22,7 +22,7 @@ class Tank:
     def __init__(self, dimensions, position, maxSpeed, angle, deltaAngle, color, wallThickness, turret, pilot):
         self._id = None
         self.dimensions = dimensions
-        self.position = tuple((position[j] % CONFIG["screen"][j] for j in range(2)))
+        self.position = tuple((position[j] % Config.screen[j] for j in range(2)))
         self.maxSpeed = maxSpeed
         self.angle = angle
         self.deltaAngle = deltaAngle
@@ -115,7 +115,7 @@ class Tank:
             self.speed = 0
             self.alivecolor = self.color
             self.color = (30, 30, 30)
-            self.destroyedUntil = time.time() + CONFIG["tankDeathDuration"]
+            self.destroyedUntil = time.time() + Config.tankDeathDuration
 
     def repair(self):
         """
@@ -256,7 +256,7 @@ class Command:
         self.state = state
         self.angle = angle
         self.speed = speed
-        self.position = tuple((position[i] % CONFIG["screen"][i] for i in range(2)))
+        self.position = tuple((position[i] % Config.screen[i] for i in range(2)))
         self.turretangle = turretangle
         self.fire = fire
 
@@ -498,47 +498,47 @@ def setBattleField(mode):
     if mode == "local":
         tanks = []
         for i in range(2):
-            x, y = (CONFIG["tanks"][i]["position"][j] % CONFIG["screen"][j] for j in range(2))
-            t = Tank(CONFIG["tankDimensions"],
+            x, y = (Config.tanks[i]["position"][j] % Config.screen[j] for j in range(2))
+            t = Tank(Config.tankDimensions,
                      (x, y),
-                     CONFIG["tankMaxSpeed"],
-                     CONFIG["tanks"][i]["angle"],
-                     CONFIG["tankDeltaAngle"],
-                     CONFIG["tanks"][i]["color"],
-                     CONFIG["wallThickness"],
-                     Turret(CONFIG["tankDimensions"],
-                            CONFIG["turretDeltaAngle"],
-                            CONFIG["turretColor"]),
-                     Pilot(CONFIG["keymap2players"][i]))
+                     Config.tankMaxSpeed,
+                     Config.tanks[i]["angle"],
+                     Config.tankDeltaAngle,
+                     Config.tanks[i]["color"],
+                     Config.wallThickness,
+                     Turret(Config.tankDimensions,
+                            Config.turretDeltaAngle,
+                            Config.turretColor),
+                     Pilot(Config.keymap2players[i]))
             tanks.append(t)
         client = None
 
     elif mode == "server":
         tanks = []
-        x, y = (CONFIG["tanks"][0]["position"][j] % CONFIG["screen"][j] for j in range(2))
-        t = Tank(CONFIG["tankDimensions"],
+        x, y = (Config.tanks[0]["position"][j] % Config.screen[j] for j in range(2))
+        t = Tank(Config.tankDimensions,
                  (x, y),
-                 CONFIG["tankMaxSpeed"],
-                 CONFIG["tanks"][0]["angle"],
-                 CONFIG["tankDeltaAngle"],
-                 CONFIG["tanks"][0]["color"],
-                 CONFIG["wallThickness"],
-                 Turret(CONFIG["tankDimensions"],
-                        CONFIG["turretDeltaAngle"],
-                        CONFIG["turretColor"]),
-                 Pilot(CONFIG["keymap1player"]))
+                 Config.tankMaxSpeed,
+                 Config.tanks[0]["angle"],
+                 Config.tankDeltaAngle,
+                 Config.tanks[0]["color"],
+                 Config.wallThickness,
+                 Turret(Config.tankDimensions,
+                        Config.turretDeltaAngle,
+                        Config.turretColor),
+                 Pilot(Config.keymap1player))
         tanks.append(t)
-        client = Client(CONFIG["ip"], CONFIG["port"], tanks, remote_tank_factory)
+        client = Client(Config.ip, Config.port, tanks, remote_tank_factory)
 
     else:
         raise RuntimeError("The mode '{}' doesn't exist.".format(mode))
 
     # Prepare walls
-    walls = [Wall((200, 100), (200, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((200, 300), (500, 300), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((450, 450), (650, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((650, 200), (650, 450), CONFIG["wallThickness"], CONFIG["wallColor"]),
-             Wall((400, 200), (650, 200), CONFIG["wallThickness"], CONFIG["wallColor"])]
+    walls = [Wall((200, 100), (200, 450), Config.wallThickness, Config.wallColor),
+             Wall((200, 300), (500, 300), Config.wallThickness, Config.wallColor),
+             Wall((450, 450), (650, 450), Config.wallThickness, Config.wallColor),
+             Wall((650, 200), (650, 450), Config.wallThickness, Config.wallColor),
+             Wall((400, 200), (650, 200), Config.wallThickness, Config.wallColor)]
 
     return (tanks, walls, client)
 
@@ -548,15 +548,15 @@ def remote_tank_factory():
     Build a tank controled remotely.
     """
     x, y = (100, 100)
-    t = Tank(CONFIG["tankDimensions"],
+    t = Tank(Config.tankDimensions,
              (x, y),
-             CONFIG["tankMaxSpeed"],
-             CONFIG["tanks"][0]["angle"],
-             CONFIG["tankDeltaAngle"],
+             Config.tankMaxSpeed,
+             Config.tanks[0]["angle"],
+             Config.tankDeltaAngle,
              (143, 138, 124, 255),
-             CONFIG["wallThickness"],
-             Turret(CONFIG["tankDimensions"],
-                    CONFIG["turretDeltaAngle"],
-                    CONFIG["turretColor"]),
+             Config.wallThickness,
+             Turret(Config.tankDimensions,
+                    Config.turretDeltaAngle,
+                    Config.turretColor),
              RemotePilot())
     return t

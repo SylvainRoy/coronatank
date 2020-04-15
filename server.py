@@ -9,7 +9,7 @@ import asyncio
 import struct
 
 from resources import Command
-from config import CONFIG
+from config import Config
 
 
 # Store the transport of each client.
@@ -36,7 +36,7 @@ class EchoServerProtocol(asyncio.Protocol):
             transport.get_extra_info('peername'),
             self._id))
         # Assign and communicate ID, position and angle to the newly connected tank.
-        tankConfig = CONFIG["tanks"][self._id]
+        tankConfig = Config.tanks[self._id]
         cmd = Command(_id=self._id, position=tankConfig["position"], angle=tankConfig["angle"])
         transport.write(cmd.encode())
         # Communicate last position of the other tanks to the newly connected tank.

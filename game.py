@@ -4,7 +4,7 @@
 import sys
 import pygame
 
-from config import CONFIG
+from config import Config
 from resources import setBattleField
 
 
@@ -12,7 +12,7 @@ def main():
 
     # Init screen
     pygame.init()
-    screen = pygame.display.set_mode(CONFIG["screen"])
+    screen = pygame.display.set_mode(Config.screen)
     pygame.display.set_caption("Tank game")
     fpsClock = pygame.time.Clock()
 
@@ -48,7 +48,7 @@ def main():
             obj.update(events, pressed, projectiles, walls, tanks)
 
         # Remove projectiles which have left the screen
-        maxX, maxY = CONFIG["screen"]
+        maxX, maxY = Config.screen
         for i in range(len(projectiles)-1, -1, -1):
             projX, projY = projectiles[i].position
             if not ((0 <= projX <= maxX) and (0 <= projY <= maxY)):
@@ -61,7 +61,7 @@ def main():
         pygame.display.update()
 
         # Ensure constant FPS
-        fpsClock.tick(CONFIG["fps"])
+        fpsClock.tick(Config.fps)
 
 
 if __name__ == '__main__':
