@@ -5,10 +5,12 @@ import sys
 import pygame
 
 from config import Config
-from resources import setBattleField
+from resources import Tank, Turret, Pilot, Wall, Client
 
 
 def main():
+
+    mode = "server" # Possible modes are "server" and "local"
 
     # Init screen
     pygame.init()
@@ -16,12 +18,14 @@ def main():
     pygame.display.set_caption("Tank game")
     fpsClock = pygame.time.Clock()
 
-    # Set up the battlefield
-    (tanks, walls, client) = setBattleField("server") # server or local
+    # prepare the battlefield
+    tanks, walls = setBattleField(mode)
     projectiles = []
 
-    # Connect to server
-    if client:
+    # Connect to the server
+    client = None
+    if mode == "server":
+        client = Client(Config.ip, Config.port, tanks)
         client.connect()
 
     while True:
@@ -62,6 +66,35 @@ def main():
 
         # Ensure constant FPS
         fpsClock.tick(Config.fps)
+
+
+def setBattleField(mode):
+    """
+    Prepare the tanks and walls of the battlefield.
+    Parameter 'mode' can be "local" or "server".
+    """
+    # Prepare tanks (2 if 'local' mode, 1 if 'server' mode) and client.
+    tanks = []
+    if mode == "local":
+        for i in range(2):
+            t = Tank(Config.tanks[i]["position"],
+                     Config.tanks[i]["angle"],
+                     Config.tanks[i]["color"],
+                     Turret(),
+                     Pilot(Config.keymap2players[i]))
+            tanks.append(t)
+    elif mode == "server":
+        t = Tank(Config.tanks[0]["position"],
+                 Config.tanks[0]["angle"],
+                 Config.tanks[0]["color"],
+                 Turret(),
+                 Pilot(Config.keymap1player))
+        tanks.append(t)
+    else:
+        raise RuntimeError("The mode '{}' doesn't exist.".format(mode))
+    # Prepare walls
+    walls = [Wall(w[0], w[1]) for w in Config.walls]
+    return (tanks, walls)
 
 
 if __name__ == '__main__':
