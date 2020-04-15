@@ -50,7 +50,8 @@ class EchoServerProtocol(asyncio.Protocol):
         global Clients, LastMessages
         # The client disconnected, remove it from the list
         del(Clients[self._id])
-        del(LastMessages[self._id])
+        if self._id in LastMessages.keys():
+            del(LastMessages[self._id])
         # Warn all the other clients
         msg = Command(_id=self._id, state=Command.State.left).encode()
         for _id, transport in Clients.items():

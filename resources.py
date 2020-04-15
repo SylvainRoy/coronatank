@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+"""
+This file contains all the main class of the game: tanks, turret, walls, etc.
+"""
 
 import pygame
 import socket
@@ -439,9 +442,38 @@ class Client:
         cmd = Command().decode(data)
         tank = self.tanks[0]
         tank._id = cmd._id
-        tank.position = cmd.position
-        tank.angle = cmd.angle
-        tank.turretangle = cmd.turretangle
+        tank.position = Config.tanks[tank._id]["position"]
+        tank.angle = Config.tanks[tank._id]["angle"]
+        tank.turretangle = 0
+        tank.color = Config.tanks[tank._id]["color"]
+
+    def update(self):
+        """
+        Send the position of the local tanks to the server.
+        Then, receive the position of the remote tanks from the server and update their pilots accordingly.
+        """
+        # Send positions of local tanks
+        for tank in self.tanks:
+            msg = Command().copy_from_tank(tank).encode()
+            if self._previousMsg[tank._id] != msg:
+                self._send_data(msg)
+                self._previousMsg[tank._id] = msg
+        # Read positions of remote self.tanks
+        self._recv_data()
+        while len(self.data) >= Command.Msglen:
+            # Read a new command
+            cmd = Command().decode(self.data[:Command.Msglen])
+            self.data = self.data[Command.Msglen:]
+            # Execute the command
+            if cmd.state == Command.State.left:
+                del(self.remoteTanks[cmd._id])
+            else:
+                tank = self.remoteTanks[cmd._id]
+                if tank._id is None:
+                    tank._id = cmd._id
+                    tank.color = Config.tanks[tank._id]["color"]
+                tank.pilot.remote_update(cmd)
+        return list(self.remoteTanks.values())
 
     def _send_data(self, msg):
         """
@@ -465,30 +497,6 @@ class Client:
         except BlockingIOError:
             data = b''
         self.data += data
-
-    def update(self):
-        """
-        Send the position of the local tanks to the server.
-        Then, receive the position of the remote tanks from the server and update their pilots accordingly.
-        """
-        # Send positions of local tanks
-        for tank in self.tanks:
-            msg = Command().copy_from_tank(tank).encode()
-            if self._previousMsg[tank._id] != msg:
-                self._send_data(msg)
-                self._previousMsg[tank._id] = msg
-        # Read positions of remote self.tanks
-        self._recv_data()
-        while len(self.data) >= Command.Msglen:
-            # Read a new command
-            cmd = Command().decode(self.data[:Command.Msglen])
-            self.data = self.data[Command.Msglen:]
-            # Execute the command
-            if cmd.state == Command.State.left:
-                del(self.remoteTanks[cmd._id])
-            else:
-                self.remoteTanks[cmd._id].pilot.remote_update(cmd)
-        return list(self.remoteTanks.values())
 
 
 def setBattleField(mode):
