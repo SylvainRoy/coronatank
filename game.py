@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 
 
+from os import environ
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+
 import sys
 import pygame
+import argparse
 
 from config import Config
 from resources import Tank, Turret, Pilot, Wall, Client
@@ -10,7 +14,15 @@ from resources import Tank, Turret, Pilot, Wall, Client
 
 def main():
 
-    mode = "server" # Possible modes are "server" and "local"
+    # Parsing command line
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--server", help="IP:port of the server")
+    args = parser.parse_args()
+    mode = "local"
+    if args.server:
+        ip, port = args.server.split(":")
+        port = int(port)
+        mode = "server"
 
     # Init screen
     pygame.init()
@@ -25,7 +37,7 @@ def main():
     # Connect to the server
     client = None
     if mode == "server":
-        client = Client(Config.ip, Config.port, tanks)
+        client = Client(ip, port, tanks)
         client.connect()
 
     while True:

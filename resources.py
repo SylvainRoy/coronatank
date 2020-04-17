@@ -477,7 +477,7 @@ class Client:
         """
         # Connect to the server
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        err = self.socket.connect(('127.0.0.1', 8888))
+        err = self.socket.connect((self.ip, self.port))
         self.socket.setblocking(0)
         # Receive ID of the local tank
         while len(self.data) < Command.Msglen:
