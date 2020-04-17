@@ -5,8 +5,12 @@ Basic tpc server that forward messages received from any client to all the other
 """
 
 
+from os import environ
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+
 import asyncio
 import struct
+import argparse
 
 from resources import Command
 from config import Config
@@ -71,8 +75,18 @@ class TankServerProtocol(asyncio.Protocol):
 
 
 async def main():
+
+    # Parsing command line
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--listen", help="IP:port of the server", required=True)
+    args = parser.parse_args()
+    if args.listen:
+        ip, port = args.listen.split(":")
+        port = int(port)
+
+    # Launch server
     loop = asyncio.get_running_loop()
-    server = await loop.create_server(lambda: TankServerProtocol(), '127.0.0.1', 8888)
+    server = await loop.create_server(lambda: TankServerProtocol(), ip, port)
     async with server:
         await server.serve_forever()
 
