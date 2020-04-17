@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+"""
+The main file of the game.
+Usage:
+
+    python3 game.py
+or
+    python3 game.py --server <ip:port>
+"""
 
 from os import environ
 environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
@@ -9,7 +17,8 @@ import pygame
 import argparse
 
 from config import Config
-from resources import Tank, Turret, Pilot, Wall, Client
+from resources import Tank, Turret, Pilot, Wall
+from client import Client
 
 
 def main():

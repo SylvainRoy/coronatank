@@ -12,8 +12,7 @@ import asyncio
 import struct
 import argparse
 
-from resources import Command
-from config import Config
+from command import Command
 
 
 # Store the transport of each client.
