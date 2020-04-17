@@ -103,7 +103,8 @@ class Tank:
         if cmd.fire is not None:
             self.turret.fire(projectiles, cmd.fire)
         if cmd.touchedby is not None:
-            projectiles[cmd.touchedby].trigger()
+            if cmd.touchedby in projectiles.keys():
+                projectiles[cmd.touchedby].trigger()
 
     def detect_collision(self, position, walls):
         """
