@@ -19,7 +19,7 @@ Clients = {}
 LastMessages = {}
 
 
-class EchoServerProtocol(asyncio.Protocol):
+class TankServerProtocol(asyncio.Protocol):
 
     def __init__(self):
         self.buffer = b''
@@ -32,14 +32,10 @@ class EchoServerProtocol(asyncio.Protocol):
         # Determine ID of the newly connected client
         self._id = min(range(len(Clients)+1) - Clients.keys())
         Clients[self._id] = transport
-        print('Connection from {} got assigned ID {}'.format(
-            transport.get_extra_info('peername'),
-            self._id))
-        # Assign and communicate ID, position and angle to the newly connected tank.
-        tankConfig = Config.tanks[self._id]
-        cmd = Command(_id=self._id, position=tankConfig["position"], angle=tankConfig["angle"])
-        transport.write(cmd.encode())
-        # Communicate last position of the other tanks to the newly connected tank.
+        print('Connection from {} got assigned ID {}'.format(transport.get_extra_info('peername'), self._id))
+        # Assign and communicate ID to the newly connected tank.
+        transport.write(Command(tankid=self._id).encode())
+        # Communicate positions of the other tanks to the newly connected tank.
         for _id, msg in LastMessages.items():
             transport.write(msg)
 
@@ -49,11 +45,12 @@ class EchoServerProtocol(asyncio.Protocol):
         """
         global Clients, LastMessages
         # The client disconnected, remove it from the list
+        print('Client {} disconnected.'.format(self._id))
         del(Clients[self._id])
         if self._id in LastMessages.keys():
             del(LastMessages[self._id])
         # Warn all the other clients
-        msg = Command(_id=self._id, state=Command.State.left).encode()
+        msg = Command(tankid=self._id, state=Command.States.left).encode()
         for _id, transport in Clients.items():
             if _id != self._id:
                 transport.write(msg)
@@ -75,7 +72,7 @@ class EchoServerProtocol(asyncio.Protocol):
 
 async def main():
     loop = asyncio.get_running_loop()
-    server = await loop.create_server(lambda: EchoServerProtocol(), '127.0.0.1', 8888)
+    server = await loop.create_server(lambda: TankServerProtocol(), '127.0.0.1', 8888)
     async with server:
         await server.serve_forever()
 

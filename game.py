@@ -20,7 +20,7 @@ def main():
 
     # prepare the battlefield
     tanks, walls = setBattleField(mode)
-    projectiles = []
+    projectiles = {}
 
     # Connect to the server
     client = None
@@ -42,25 +42,25 @@ def main():
                 pygame.quit()
                 sys.exit()
 
-        # Get remote tanks from server
+        # Synchronize with server
         remoteTanks = []
         if client:
-            remoteTanks = client.update()
+            remoteTanks = client.synchronize()
 
         # Compute new positions
-        for obj in tanks + remoteTanks + projectiles:
-            obj.update(events, pressed, projectiles, walls, tanks)
+        for obj in tanks + remoteTanks + list(projectiles.values()):
+            obj.update(events, pressed, projectiles, walls, tanks, client)
 
         # Remove projectiles which have left the screen
         maxX, maxY = Config.screen
-        for i in range(len(projectiles)-1, -1, -1):
-            projX, projY = projectiles[i].position
+        for projectile in list(projectiles.values()):
+            projX, projY = projectile.position
             if not ((0 <= projX <= maxX) and (0 <= projY <= maxY)):
-                del(projectiles[i])
+                del(projectiles[projectile._id])
 
         # Redraw boards
         screen.fill((220, 220, 220, 0))
-        for obj in walls + tanks + remoteTanks + projectiles:
+        for obj in walls + tanks + remoteTanks + list(projectiles.values()):
             obj.draw(screen)
         pygame.display.update()
 

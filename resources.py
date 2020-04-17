@@ -13,6 +13,8 @@ from collections import defaultdict
 from math import cos, sin, sqrt, radians, copysign
 from enum import Enum
 from collections import namedtuple
+from random import randint
+
 from config import Config
 
 
@@ -22,17 +24,38 @@ class Tank:
     It requires a turret and a pilot.
     """
 
-    def __init__(self, position, angle, color, turret, pilot):
+    def __init__(self, position=None, angle=None, color=None, turret=None, pilot=None):
         self._id = None
-        self.position = tuple((position[j] % Config.screen[j] for j in range(2)))
+        if position:
+            self.position = tuple((position[j] % Config.screen[j] for j in range(2)))
+        else:
+            self.position = None
         self.angle = angle
         self.color = color
         self.speed = 0
-        self.turret = turret
+        if turret is None:
+            self.turret = Turret()
+        else:
+            self.turret = turret
         self.turret.tank = self
-        self.pilot = pilot
+        if pilot is None:
+            self.pilot = RemotePilot()
+        else:
+            self.pilot = pilot
         self.fire = False
         self.destroyedUntil = None
+        self.touchedby = None
+
+    def init_from_id(self, tankid):
+        """
+        Updates the tank once it got an ID assinged by the server.
+        """
+        self._id = tankid
+        self.position = tuple((Config.tanks[tankid]["position"][i] % Config.screen[i]
+                               for i in range(2)))
+        self.angle = Config.tanks[tankid]["angle"]
+        self.color = Config.tanks[tankid]["color"]
+        return self
 
     def draw(self, screen):
         """
@@ -58,33 +81,55 @@ class Tank:
         # Display the tank
         screen.blit(surface, (x,y))
 
-    def update(self, events, pressed, projectiles, walls, tanks):
+    def update(self, events, pressed, projectiles, walls, tanks, client):
         """
-        Updates the state of the tank based on player's input and game state.
+        Updates the state of the tank based on the pilot's command.
         """
         # Get instructions from pilot
-        cmd = self.pilot.update(self, events, pressed, projectiles, walls)
+        cmd = self.pilot.update(self, events, pressed, projectiles, walls, client)
+        if cmd is None:
+            return
+        assert(self._id == cmd.tankid)
         # Update the tank accordingly
-        self.angle = cmd.angle
-        self.speed = cmd.speed
-        self.position = cmd.position
-        self.turret.angle = cmd.turretangle
-        self.fire = cmd.fire
-        if (cmd.state == Command.State.destroyed) and (self.destroyedUntil is None):
+        if cmd.state == Command.States.destroyed:
             self.destroy()
-        if (cmd.state == Command.State.operational) and (self.destroyedUntil is not None):
+        elif cmd.state == Command.States.operational:
             self.repair()
-        if self.fire:
-            self.turret.fire(projectiles)
+        if cmd.angle is not None:
+            self.angle = cmd.angle
+        if cmd.speed is not None:
+            self.speed = cmd.speed
+        if cmd.position is not None:
+            self.position = cmd.position
+        if cmd.turretangle is not None:
+            self.turret.angle = cmd.turretangle
+        if cmd.fire is not None:
+            self.turret.fire(projectiles, cmd.fire)
+        if cmd.touchedby is not None:
+            projectiles[cmd.touchedby].trigger()
 
     def detect_collision(self, position, walls):
         """
-        Detects collision with walls at position.
+        Detects collisions with walls at position.
         """
         innerrect = self.get_inner_rect(position)
         wallrects = [w.rect for w in walls]
         indices = innerrect.collidelistall(wallrects)
         return len(indices) != 0
+
+    def detect_hit(self, projectiles):
+        """
+        Detects hits by projectiles.
+        Returns a projectile or None.
+        """
+        tankrect = self.get_avg_rect()
+        for projectile in projectiles.values():
+            # A tank cannot destroy itself
+            if projectile.tank == self:
+                continue
+            if tankrect.collidepoint(projectile.position):
+                return projectile
+        return None
 
     def get_inner_rect(self, position=None):
         """
@@ -120,8 +165,12 @@ class Tank:
         """
         Repairs the tank.
         """
-        self.color = self.alivecolor
-        self.destroyedUntil = None
+        if self.destroyedUntil is not None:
+            self.color = self.alivecolor
+            self.destroyedUntil = None
+
+    def __repr__(self):
+        return "<Tank {} {} {}>".format(self._id, self.position, self.angle)
 
 
 class Turret:
@@ -149,14 +198,16 @@ class Turret:
         canonEndY = self.centerY - sin(radians(self.angle)) * self.canonLen
         pygame.draw.line(surface, self.color, (self.centerX, self.centerY), (canonEndX, canonEndY), 4)
 
-    def fire(self, projectiles):
+    def fire(self, projectiles, projectileid):
         """
         Fires a new projectile.
         """
         angle = self.tank.angle + self.angle
         aX = int(self.tank.position[0] + self.canonLen * cos(radians(angle)))
         aY = int(self.tank.position[1] - self.canonLen * sin(radians(angle)))
-        projectiles.append(Amunition((aX, aY), angle, self.tank))
+        projectile = Amunition(projectileid, (aX, aY), angle, self.tank)
+        projectiles[projectileid] = projectile
+        return projectile
 
 
 class Amunition:
@@ -164,14 +215,20 @@ class Amunition:
     The projectiles fired by the tank.
     """
 
-    States = Enum('States', 'active detonated destroyed')
+    States = Enum('States', 'active triggered detonated')
+    _Counter = 1000 * randint(1, 1000)
 
-    def __init__(self, position, angle, tank):
+    def __init__(self, _id, position, angle, tank):
+        self._id = _id
         self.position = position
         self.angle = angle
         self.speed = 10
         self.tank = tank
         self.state = self.States.active
+
+    def next_id():
+        Amunition._Counter += 1
+        return Amunition._Counter
 
     def draw(self, screen):
         """
@@ -179,17 +236,17 @@ class Amunition:
         """
         if self.state == self.States.active:
             pygame.draw.circle(screen, (0,0,0,255), self.position, 3)
-        elif self.state == self.States.detonated:
+        elif self.state == self.States.triggered:
             pygame.draw.circle(screen, (0,0,0,255), self.position, 30)
+            self.state = self.state.detonated
 
-    def update(self, events, pressed, projectiles, walls, tanks):
+    def update(self, events, pressed, projectiles, walls, tanks, client):
         """
         Updates the state of the projectile.
         """
         # Move the projectile off the screen if detonated, it'll get it removed
         if self.state == self.States.detonated:
-            self.state = self.States.destroyed
-            self.position = (-1000, -1000)
+            self.position = (-10, -10)
             self.angle = 180
             self.speed = 10
             return
@@ -202,12 +259,14 @@ class Amunition:
         # (Collision with tanks are detected by the Pilot)
         for wall in walls:
             if wall.rect.collidepoint(self.position):
-                self.state = self.States.detonated
-        # # Detect collision with a tank
-        # for tank in tanks:
-        #     if tank.get_avg_rect().collidepoint(self.position):
-        #         self.state = self.States.detonated
-        #         tank.destroy()
+                self.trigger()
+                return
+
+    def trigger(self):
+        """
+        Trigger the explosion of the projectile.
+        """
+        self.state = self.States.triggered
 
 
 class Wall:
@@ -243,49 +302,58 @@ class Command:
     Possibly exchanged over the network.
     """
 
-    Format = 'i'*7
+    Format = 'i'*9
     Msglen = struct.calcsize(Format)
-    State = Enum("State", "operational destroyed left")
+    # todo: should be States
+    States = Enum("State", "operational destroyed left")
 
-    def __init__(self, _id=None, state=State.operational, angle=0, speed=0, position=(0,0), turretangle=0, fire=False):
-        self._id = _id
+    def __init__(self, tankid=None, state=None, angle=None, speed=None,
+                 position=None, turretangle=None, fire=None, touchedby=None):
+        self.tankid = tankid
         self.state = state
         self.angle = angle
         self.speed = speed
-        self.position = tuple((position[i] % Config.screen[i] for i in range(2)))
+        self.position = position
+        if self.position is not None:
+            self.position = tuple((position[i] % Config.screen[i] for i in range(2)))
         self.turretangle = turretangle
         self.fire = fire
+        self.touchedby = touchedby
+        assert((self.touchedby is None) or (type(self.touchedby) == int))
 
     def encode(self):
-        x, y = self.position
-        fire = int(self.fire)
-        state = self.state.value
-        return struct.pack('i'*7, self._id, state, self.angle, x, y, self.turretangle, fire)
+        tankid = self.tankid if self.tankid is not None else -1
+        state = self.state.value if self.state is not None else -1
+        angle = self.angle if self.angle is not None else Config.maxInt
+        speed = self.speed if self.speed is not None else Config.maxInt
+        x, y = self.position if self.position is not None else (-1, -1)
+        turretangle = self.turretangle if self.turretangle is not None else Config.maxInt
+        fire = self.fire if self.fire is not None else -1
+        touchedby = self.touchedby if self.touchedby is not None else -1
+        return struct.pack(self.Format,
+                           tankid, state, angle, speed, x, y, turretangle, fire, touchedby)
 
     def decode(self, data):
-        self._id, state, self.angle, x, y, self.turretangle, fire = struct.unpack('i'*7, data)
-        self.state = self.State(state)
-        self.position = (x, y)
-        self.fire = (fire == 1)
+        tankid, state, angle, speed, x, y, turretangle, fire, touchedby = struct.unpack(self.Format, data)
+        self.tankid = tankid if tankid != -1 else None
+        self.state = self.States(state) if state != -1 else None
+        self.angle = angle if angle != Config.maxInt else None
+        self.speed = speed if speed != Config.maxInt else None
+        self.position = (x, y) if x != -1 else None
+        self.turretangle = turretangle if turretangle != Config.maxInt else None
+        self.fire = fire if fire != -1 else None
+        self.touchedby = touchedby if touchedby != -1 else None
         return self
 
-    def copy_from_tank(self, tank):
-        self._id = tank._id
-        if tank.destroyedUntil is None:
-            self.state = self.State.operational
-        else:
-            self.state = self.State.destroyed
-        self.angle = tank.angle
-        self.speed = tank.speed
-        self.position = tank.position
-        self.turretangle = tank.turret.angle
-        self.fire = tank.fire
-        return self
+    def __repr__(self):
+        return "<Cmd {} {} {} {} {} {} {} {}>".format(self.tankid, self.state, self.angle, self.speed,
+                                                  self.position, self.turretangle, self.fire, self.touchedby)
 
 
 class Pilot:
     """
-    A basic pilot that drives the tank based on the player's input.
+    A basic pilot that drives a tank based on the player's input.
+    This class should be 'stateless'.
     """
 
     def __init__(self, keymap):
@@ -297,22 +365,30 @@ class Pilot:
         self.turretLeft = keymap["turretLeft"]
         self.fire = keymap["fire"]
 
-    def update(self, tank, events, pressed, projectiles, walls):
+    def update(self, tank, events, pressed, projectiles, walls, client):
+        """
+        Build next command, send it to the server (for remote tanks) and return it (for local tank).
+        """
+        cmd = self.command(tank, events, pressed, projectiles, walls)
+        if client and cmd:
+            client.send_command(cmd)
+        return cmd
+
+    def command(self, tank, events, pressed, projectiles, walls):
+        """
+        Return a command to be executed by the local and remote tanks, None if nothing to do.
+        """
+        # No move if the tank is destroyed
+        if tank.destroyedUntil:
+            if time.time() < tank.destroyedUntil:
+                return None
+            else:
+                return Command(tankid=tank._id, state=Command.States.operational)
 
         # Detect collisions with projectiles
-        tankrect = tank.get_avg_rect()
-        for projectile in projectiles:
-            if projectile.tank == tank:
-                continue
-            if tankrect.collidepoint(projectile.position):
-                projectile.state = Amunition.States.detonated
-                return Command(angle=tank.angle, speed=0, position=tank.position,
-                               turretangle=tank.turret.angle, fire=False, state=Command.State.destroyed)
-
-        # No move if the tank is destroyed
-        if tank.destroyedUntil and time.time() < tank.destroyedUntil:
-            return Command(angle=tank.angle, speed=0, position=tank.position,
-                           turretangle=tank.turret.angle, fire=False, state=Command.State.destroyed)
+        projectile = tank.detect_hit(projectiles)
+        if projectile is not None:
+            return Command(tankid=tank._id, speed=0, state=Command.States.destroyed, touchedby=projectile._id)
 
         # Compute new tank angle based on player's input
         rotation = Config.tankDeltaAngle * (pressed[self.left] - pressed[self.right])
@@ -350,9 +426,9 @@ class Pilot:
         newturretangle = tank.turret.angle + rotation
 
         # Fire a new projectile
-        fire = False
+        fire = None
         if any((e.type == pygame.KEYUP and e.key == self.fire for e in events)):
-            fire = True
+            fire = Amunition.next_id()
 
         assert(type(newtankangle) == int)
         assert(type(newtankspeed) == int)
@@ -360,35 +436,22 @@ class Pilot:
         assert(type(newtankposition[1]) == int)
         assert(type(newturretangle) == int)
 
-        return Command(angle=newtankangle, speed=newtankspeed, position=newtankposition,
-                         turretangle=newturretangle, fire=fire, state=Command.State.operational)
+        return Command(tankid=tank._id, angle=newtankangle, speed=newtankspeed,
+                       position=newtankposition, turretangle=newturretangle, fire=fire)
 
 
 class RemotePilot:
     """
-    A "dummy' pilot which only executes the last instructions from a remote server.
+    A "dummy' pilot which returns the command from the server.
+    This class should be 'stateless'.
     """
 
-    def __init__(self):
-        self.cmd = Command()
-        self.cmd_exectured = False
-
-    def update(self, tank, events, pressed, projectiles, walls):
+    def update(self, tank, events, pressed, projectiles, walls, client):
         """
-        Return latest instructions to the tank.
+        Collects last command from the server and return it to the tank.
         """
-        if self.cmd_executed:
-            self.cmd.fire = False
-        self.executed = True
-        return self.cmd
-
-    def remote_update(self, cmd):
-        """
-        Update the pilot with the information from the server.
-        """
-        self.cmd = cmd
-        self.cmd_executed = False
-
+        cmd = client.recv_command(tank._id)
+        return cmd
 
 class Client:
     """
@@ -396,30 +459,22 @@ class Client:
     """
 
     def __init__(self, ip, port, tanks):
-        assert(len(tanks) == 1)
-        self.remoteTanks = defaultdict(self.tank_factory)
-        self.tanks = tanks
         self.ip = ip
         self.port = port
-        self.data = b''
+        self.tanks = tanks
+        assert(len(tanks) == 1)
         self.socket = None
-        self._previousMsg = defaultdict(lambda: None)
-
-    def tank_factory(self):
-        """
-        Build a tank controled remotely.
-        """
-        return Tank(Config.tanks[0]["position"],
-                    Config.tanks[0]["angle"],
-                    (143, 138, 124, 255),
-                    Turret(),
-                    RemotePilot())
+        self.data = b''
+        # The list of tanks controlled remotely
+        self.remoteTanks = {}
+        # The last received command from tanks controlled remotely
+        # todo: Should be a queue?
+        self._lastCommandReceived = defaultdict(lambda: [])
 
     def connect(self):
         """
         Connect the client to the server in non-blocking mode.
         """
-        assert(len(self.tanks) == 1)
         # Connect to the server
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         err = self.socket.connect(('127.0.0.1', 8888))
@@ -430,39 +485,45 @@ class Client:
         cmd = Command().decode(self.data[:Command.Msglen])
         self.data = self.data[Command.Msglen:]
         # Update the local tank
-        tank = self.tanks[0]
-        tank._id = cmd._id
-        tank.position = Config.tanks[tank._id]["position"]
-        tank.angle = Config.tanks[tank._id]["angle"]
-        tank.turretangle = 0
-        tank.color = Config.tanks[tank._id]["color"]
+        assert(len(self.tanks) == 1)
+        self.tanks[0].init_from_id(cmd.tankid)
 
-    def update(self):
+    def recv_command(self, tankid):
         """
-        Send the position of the local tanks to the server.
-        Then, receive the position of the remote tanks from the server and update their pilots accordingly.
+        Returns the last command or None.
+        Called by remotePilots to get last command from the server.
         """
-        # Send positions of local tanks
-        for tank in self.tanks:
-            msg = Command().copy_from_tank(tank).encode()
-            if self._previousMsg[tank._id] != msg:
-                self._send_data(msg)
-                self._previousMsg[tank._id] = msg
-        # Read positions of remote self.tanks
+        if len(self._lastCommandReceived[tankid]) == 0:
+            return None
+        return self._lastCommandReceived[tankid].pop()
+
+    def send_command(self, cmd):
+        """
+        Called by Pilots to transmit commands to the server.
+        """
+        self._send_data(cmd.encode())
+
+    def synchronize(self):
+        """
+        Receives the commands from the server, executes or stores them.
+        """
+        # Read commands received from the server
         self._recv_data()
         while len(self.data) >= Command.Msglen:
             # Read a new command
             cmd = Command().decode(self.data[:Command.Msglen])
             self.data = self.data[Command.Msglen:]
-            # Execute the command
-            if cmd.state == Command.State.left:
-                del(self.remoteTanks[cmd._id])
+            # Remove disconnected tank
+            if cmd.state == Command.States.left:
+                del(self.remoteTanks[cmd.tankid])
+                del(self._lastCommandReceived[cmd.tankid])
+            # Store received command, the RemotePilot will read it later
             else:
-                tank = self.remoteTanks[cmd._id]
-                if tank._id is None:
-                    tank._id = cmd._id
-                    tank.color = Config.tanks[tank._id]["color"]
-                tank.pilot.remote_update(cmd)
+                # If this is a new tank, create and initialize it
+                if cmd.tankid not in self.remoteTanks:
+                    self.remoteTanks[cmd.tankid] = Tank().init_from_id(cmd.tankid)
+                # Queue received command
+                self._lastCommandReceived[cmd.tankid].insert(0, cmd)
         return list(self.remoteTanks.values())
 
     def _send_data(self, msg):

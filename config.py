@@ -16,8 +16,10 @@ class Config:
     ip = "127.0.0.1"
     port = 8080
 
+    maxInt = 99999999
+
     tankDimensions = (50, 40)
-    tankMaxSpeed = 5
+    tankMaxSpeed = 6
     tankDeltaAngle = 6
     tankDeathDuration = 5
 
@@ -27,6 +29,7 @@ class Config:
     wallColor = (200, 120, 10)
     wallThickness = 10
 
+    # Negative coordinates are measured backward from the bottom/right
     tanks = [
         {"position": (50, 50), "angle": -45, "color": (20, 150, 50, 255)},
         {"position": (-50, -50), "angle": 135, "color": (50, 150, 250, 255)},
@@ -34,6 +37,8 @@ class Config:
         {"position": (50, -50), "angle": 45, "color": (150, 50, 20, 255)}
     ]
 
+    # Walls can only be vertical or horizontal.
+    # The first coordindate MUST be at the top-left.
     walls = [
         ((200, 100), (200, 450)),
         ((200, 300), (500, 300)),
