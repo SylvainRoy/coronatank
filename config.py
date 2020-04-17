@@ -13,9 +13,6 @@ class Config:
     fps = 50
     screen = (800, 600)
 
-    ip = "127.0.0.1"
-    port = 8080
-
     maxInt = 99999999
 
     tankDimensions = (50, 40)
