@@ -35,16 +35,17 @@ Then, each player can run the client:
 # How to build/use the docker image of the server?
 
 The docker image is automatically built on docker hub. So, the simplest option is to pull it from there:
+
     docker run -p 8888:8888 -d sroy/tank
 
 In case you want to build it yourself:
+
     docker build -t <user/repository> .
     docker run -p 8888:8888 -d <user/repository>
 
 
 # What's next?
 
- * A docker image of the server to easily deploy it in the cloud.
  * A small AI to allow a single player mode.
  * Better weapons!
  * Sprites!
