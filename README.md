@@ -43,6 +43,27 @@ In case you want to build it yourself:
     docker build -t <user/repository> .
     docker run -p 8888:8888 -d <user/repository>
 
+You might want the server to run in the cloud to play with friends all over the world.
+Here are the commands to do just that with Azure:
+
+    az group create --name tank-group --location westeurope
+    DNS_NAME_LABEL=tank-sroy-$RANDOM
+    az container create --resource-group tank-group --name tank-container --image sroy/tank:latest --ports 8888 --dns-name-label $DNS_NAME_LABEL --location westeurope
+
+Then, to check its state:
+
+    az container show --resource-group tank-group --name tank-container --query containers[0].instanceView.currentState.state
+
+To see the logs:
+
+    az container logs --resource-group tank-group --name tank-container
+
+And to start/stop it:
+
+    az container start --resource-group tank-group --name tank-container
+    az container stop --resource-group tank-group --name tank-container
+
+
 
 # What's next?
 
