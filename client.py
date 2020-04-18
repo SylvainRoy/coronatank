@@ -38,6 +38,8 @@ class Client:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         err = self.socket.connect((self.ip, self.port))
         self.socket.setblocking(0)
+        # Send ID request
+        self.send_command(Command(state=Command.States.init))
         # Receive ID of the local tank
         while len(self.data) < Command.Msglen:
             self._recv_data(Command.Msglen - len(self.data))

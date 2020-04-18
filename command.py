@@ -19,7 +19,7 @@ class Command:
 
     Format = 'i'*9
     Msglen = struct.calcsize(Format)
-    States = Enum("States", "operational destroyed left")
+    States = Enum("States", "init operational destroyed left")
 
     def __init__(self, tankid=None, state=None, angle=None, speed=None,
                  position=None, turretangle=None, fire=None, touchedby=None):

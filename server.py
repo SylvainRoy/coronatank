@@ -26,37 +26,15 @@ class TankServerProtocol(asyncio.Protocol):
 
     def __init__(self):
         self.buffer = b''
+        self._id = None
+        self.transport = None
 
     def connection_made(self, transport):
         """
         Accept cxn of new client, assign them an ID.
         """
-        global Clients, LastMessages
-        # Determine ID of the newly connected client
-        self._id = min(range(len(Clients)+1) - Clients.keys())
-        Clients[self._id] = transport
-        print('Connection from {} got assigned ID {}'.format(transport.get_extra_info('peername'), self._id))
-        # Assign and communicate ID to the newly connected tank.
-        transport.write(Command(tankid=self._id).encode())
-        # Communicate positions of the other tanks to the newly connected tank.
-        for _id, msg in LastMessages.items():
-            transport.write(msg)
-
-    def connection_lost(self, exc):
-        """
-        Remove the disconected client from the list of active clients.
-        """
-        global Clients, LastMessages
-        # The client disconnected, remove it from the list
-        print('Client {} disconnected.'.format(self._id))
-        del(Clients[self._id])
-        if self._id in LastMessages.keys():
-            del(LastMessages[self._id])
-        # Warn all the other clients
-        msg = Command(tankid=self._id, state=Command.States.left).encode()
-        for _id, transport in Clients.items():
-            if _id != self._id:
-                transport.write(msg)
+        print('New connection from {}'.format(transport.get_extra_info('peername')))
+        self.transport = transport
 
     def data_received(self, data):
         """
@@ -65,12 +43,48 @@ class TankServerProtocol(asyncio.Protocol):
         global Clients, LastMessages
         self.buffer += data
         while len(self.buffer) >= Command.Msglen:
+
+            # Read next message
             msg = self.buffer[:Command.Msglen]
-            LastMessages[self._id] = msg
+            self.buffer = self.buffer[Command.Msglen:]
+
+            # The first message received should be an init request
+            if self._id is None and Command().decode(msg).state == Command.States.init:
+                # Determine the ID of the newly connected client
+                self._id = min(range(len(Clients)+1) - Clients.keys())
+                Clients[self._id] = self.transport
+                print("{} got assigned ID '{}'".format(self.transport.get_extra_info('peername'),
+                                                     self._id))
+                # Communicate ID to the newly connected tank.
+                self.transport.write(Command(tankid=self._id).encode())
+                # Communicate positions of the other tanks to the newly connected tank.
+                for _id, msg in LastMessages.items():
+                    self.transport.write(msg)
+
+            # Later messages received are tank updates to transmit to all other tanks
+            else:
+                LastMessages[self._id] = msg
+                for _id, transport in Clients.items():
+                    if _id != self._id:
+                        transport.write(msg)
+
+    def connection_lost(self, exc):
+        """
+        Remove the disconected client from the list of active clients.
+        """
+        global Clients, LastMessages
+        # The client disconnected, remove it from the list
+        print("Client '{}' disconnected.".format(self._id))
+        if self._id in Clients.keys():
+            del(Clients[self._id])
+        if self._id in LastMessages.keys():
+            del(LastMessages[self._id])
+        # Warn all the other clients
+        if self._id is not None:
+            msg = Command(tankid=self._id, state=Command.States.left).encode()
             for _id, transport in Clients.items():
                 if _id != self._id:
                     transport.write(msg)
-            self.buffer = self.buffer[Command.Msglen:]
 
 
 async def main():
