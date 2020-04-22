@@ -9,9 +9,10 @@ It can also be played by up to four players, each of them on its own machine. (Y
 
 # How to install it?
 
-Ensure to have python (3.6 or above) and then install pygame:
+The game is on pypi:
 
-    python -m pip install pygame
+    pip instal coronatank
+
 
 Then, to launch the game:
 
@@ -48,7 +49,7 @@ Here are the commands to do just that with Azure:
 
     az group create --name tank-group --location westeurope
     DNS_NAME_LABEL=tank-sroy-$RANDOM
-    az container create --resource-group tank-group --name tank-container --image sroy/tank:latest --ports 8888 --dns-name-label $DNS_NAME_LABEL --location westeurope
+    az container create --resource-group tank-group --name tank-container --image sroy/coronatank:latest --ports 8888 --dns-name-label $DNS_NAME_LABEL --location westeurope
 
 Then, to check its state:
 
