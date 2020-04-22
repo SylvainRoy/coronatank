@@ -12,8 +12,8 @@ from math import cos, sin, sqrt, radians, copysign
 from enum import Enum
 from random import randint
 
-from config import Config
-from command import Command
+from . import Config
+from . import Command
 
 class Tank:
     """

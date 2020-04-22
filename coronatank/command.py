@@ -8,7 +8,7 @@ import struct
 
 from enum import Enum
 
-from config import Config
+from . import Config
 
 
 class Command:

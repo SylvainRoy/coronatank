@@ -16,9 +16,9 @@ import sys
 import pygame
 import argparse
 
-from config import Config
-from resources import Tank, Turret, Pilot, Wall
-from client import Client
+from . import Config
+from . import Tank, Turret, Pilot, Wall
+from . import Client
 
 
 def main():

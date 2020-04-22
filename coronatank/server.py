@@ -12,7 +12,7 @@ import asyncio
 import struct
 import argparse
 
-from command import Command
+from . import Command
 
 
 # Store the transport of each client.
@@ -87,7 +87,7 @@ class TankServerProtocol(asyncio.Protocol):
                     transport.write(msg)
 
 
-async def main():
+async def runserver():
 
     # Parsing command line
     parser = argparse.ArgumentParser()
@@ -104,5 +104,9 @@ async def main():
         await server.serve_forever()
 
 
+def server():
+    asyncio.run(runserver())
+
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    server()

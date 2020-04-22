@@ -11,11 +11,11 @@ It can also be played by up to four players, each of them on its own machine. (Y
 
 Ensure to have python (3.6 or above) and then install pygame:
 
-    python3 -m pip install pygame
+    python -m pip install pygame
 
 Then, to launch the game:
 
-    python3 game.py
+    python -m coronatank.game
 
 Press all the keys of your keyboard to figure out how to move, rotate,
 rotate the turret, fire with the two tanks. (Enjoy!)
@@ -25,18 +25,18 @@ rotate the turret, fire with the two tanks. (Enjoy!)
 
 The first thing to do is to run the server:
 
-    python3 server.py --listen <ip:port>
+    python -m coronatank.server --listen <ip:port>
 
 Then, each player can run the client:
 
-    python3 game.py --server <ip:port>
+    python -m coronatank.game --server <ip:port>
 
 
 # How to build/use the docker image of the server?
 
 The docker image is automatically built on docker hub. So, the simplest option is to pull it from there:
 
-    docker run -p 8888:8888 -d sroy/tank
+    docker run -p 8888:8888 -d sroy/coronatank
 
 In case you want to build it yourself:
 

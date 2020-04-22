@@ -9,8 +9,8 @@ import socket
 
 from collections import defaultdict
 
-from command import Command
-from resources import Tank
+from . import Command
+from . import Tank
 
 
 class Client:

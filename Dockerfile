@@ -8,6 +8,6 @@ ADD . /var/tank
 RUN pip install pygame
 
 WORKDIR /var/tank
-CMD python /var/tank/server.py --listen 0.0.0.0:8888
+CMD python -m coronatank.server --listen 0.0.0.0:8888
 
 EXPOSE 8888
